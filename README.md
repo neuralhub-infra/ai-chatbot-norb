@@ -1,3 +1,18 @@
+<div align="center" style="margin-bottom: 10px;">
+
+<table width="100%">
+<tr>
+<td style="background-color: #00b289; color: white; border-radius: 6px 6px 0 0; padding: 6px; text-align: center;">
+<strong>🔔  Modification Notice</strong>
+</td>
+</tr>
+<tr>
+<td style="border: 2px solid #00b289; border-top: none; padding: 8px; text-align: center;">
+ This version of the <strong>Vercel AI Chatbot</strong> has been enhanced with integration to the <strong>NeuralHub Norb</strong> endpoint, expanding its capabilities and performance.
+</td>
+</tr>
+</table>
+
 <a href="https://chat.vercel.ai/">
   <img alt="Next.js 14 and App Router-ready AI chatbot." src="https://chat.vercel.ai/opengraph-image.png">
   <h1 align="center">Next.js AI Chatbot</h1>
