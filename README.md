@@ -12,6 +12,7 @@
 </td>
 </tr>
 </table>
+</div>
 
 <a href="https://chat.vercel.ai/">
   <img alt="Next.js 14 and App Router-ready AI chatbot." src="https://chat.vercel.ai/opengraph-image.png">
