@@ -1,85 +1,125 @@
-'use client'
+'use client';
 
-import { cn } from '@/lib/utils'
-import { ChatList } from '@/components/chat-list'
-import { ChatPanel } from '@/components/chat-panel'
-import { EmptyScreen } from '@/components/empty-screen'
-import { useLocalStorage } from '@/lib/hooks/use-local-storage'
-import { useEffect, useState } from 'react'
-import { useUIState, useAIState } from 'ai/rsc'
-import { Session } from '@/lib/types'
-import { usePathname, useRouter } from 'next/navigation'
-import { Message } from '@/lib/chat/actions'
-import { useScrollAnchor } from '@/lib/hooks/use-scroll-anchor'
-import { toast } from 'sonner'
+import type { Attachment, Message } from 'ai';
+import { useChat } from 'ai/react';
+import { useState } from 'react';
+import useSWR, { useSWRConfig } from 'swr';
 
-export interface ChatProps extends React.ComponentProps<'div'> {
-  initialMessages?: Message[]
-  id?: string
-  session?: Session
-  missingKeys: string[]
-}
+import { ChatHeader } from '@/components/chat-header';
+import type { Vote } from '@/lib/db/schema';
+import { fetcher, generateUUID } from '@/lib/utils';
 
-export function Chat({ id, className, session, missingKeys }: ChatProps) {
-  const router = useRouter()
-  const path = usePathname()
-  const [input, setInput] = useState('')
-  const [messages] = useUIState()
-  const [aiState] = useAIState()
+import { Artifact } from './artifact';
+import { MultimodalInput } from './multimodal-input';
+import { Messages } from './messages';
+import { VisibilityType } from './visibility-selector';
+import { useArtifactSelector } from '@/hooks/use-artifact';
+import { toast } from 'sonner';
 
-  const [_, setNewChatId] = useLocalStorage('newChatId', id)
+export function Chat({
+  id,
+  initialMessages,
+  selectedChatModel,
+  selectedVisibilityType,
+  isReadonly,
+}: {
+  id: string;
+  initialMessages: Array<Message>;
+  selectedChatModel: string;
+  selectedVisibilityType: VisibilityType;
+  isReadonly: boolean;
+}) {
+  const { mutate } = useSWRConfig();
 
-  useEffect(() => {
-    if (session?.user) {
-      if (!path.includes('chat') && messages.length === 1) {
-        window.history.replaceState({}, '', `/chat/${id}`)
-      }
-    }
-  }, [id, path, session?.user, messages])
+  const {
+    messages,
+    setMessages,
+    handleSubmit,
+    input,
+    setInput,
+    append,
+    isLoading,
+    stop,
+    reload,
+  } = useChat({
+    id,
+    body: { id, selectedChatModel: selectedChatModel },
+    initialMessages,
+    experimental_throttle: 100,
+    sendExtraMessageFields: true,
+    generateId: generateUUID,
+    onFinish: () => {
+      mutate('/api/history');
+    },
+    onError: (error) => {
+      toast.error('An error occured, please try again!');
+    },
+  });
 
-  useEffect(() => {
-    const messagesLength = aiState.messages?.length
-    if (messagesLength === 2) {
-      router.refresh()
-    }
-  }, [aiState.messages, router])
+  const { data: votes } = useSWR<Array<Vote>>(
+    `/api/vote?chatId=${id}`,
+    fetcher,
+  );
 
-  useEffect(() => {
-    setNewChatId(id)
-  })
-
-  useEffect(() => {
-    missingKeys.map(key => {
-      toast.error(`Missing ${key} environment variable!`)
-    })
-  }, [missingKeys])
-
-  const { messagesRef, scrollRef, visibilityRef, isAtBottom, scrollToBottom } =
-    useScrollAnchor()
+  const [attachments, setAttachments] = useState<Array<Attachment>>([]);
+  const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
 
   return (
-    <div
-      className="group w-full overflow-auto pl-0 peer-[[data-state=open]]:lg:pl-[250px] peer-[[data-state=open]]:xl:pl-[300px]"
-      ref={scrollRef}
-    >
-      <div
-        className={cn('pb-[200px] pt-4 md:pt-10', className)}
-        ref={messagesRef}
-      >
-        {messages.length ? (
-          <ChatList messages={messages} isShared={false} session={session} />
-        ) : (
-          <EmptyScreen />
-        )}
-        <div className="h-px w-full" ref={visibilityRef} />
+    <>
+      <div className="flex flex-col min-w-0 h-dvh bg-background">
+        <ChatHeader
+          chatId={id}
+          selectedModelId={selectedChatModel}
+          selectedVisibilityType={selectedVisibilityType}
+          isReadonly={isReadonly}
+        />
+
+        <Messages
+          chatId={id}
+          isLoading={isLoading}
+          votes={votes}
+          messages={messages}
+          setMessages={setMessages}
+          reload={reload}
+          isReadonly={isReadonly}
+          isArtifactVisible={isArtifactVisible}
+        />
+
+        <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
+          {!isReadonly && (
+            <MultimodalInput
+              chatId={id}
+              input={input}
+              setInput={setInput}
+              handleSubmit={handleSubmit}
+              isLoading={isLoading}
+              stop={stop}
+              attachments={attachments}
+              setAttachments={setAttachments}
+              messages={messages}
+              setMessages={setMessages}
+              append={append}
+            />
+          )}
+        </form>
       </div>
-      <ChatPanel
-        id={id}
+
+      <Artifact
+        chatId={id}
         input={input}
         setInput={setInput}
-        isAtBottom={isAtBottom}
-        scrollToBottom={scrollToBottom}
+        handleSubmit={handleSubmit}
+        isLoading={isLoading}
+        stop={stop}
+        attachments={attachments}
+        setAttachments={setAttachments}
+        append={append}
+        messages={messages}
+        setMessages={setMessages}
+        reload={reload}
+        votes={votes}
+        isReadonly={isReadonly}
       />
-    </div>
-  )
+    </>
+  );
 }
